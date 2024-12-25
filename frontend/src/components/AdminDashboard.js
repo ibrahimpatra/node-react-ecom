@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 const AdminDashboard = () => {
     const [products, setProducts] = useState([]);
     const [users, setUsers] = useState([]);
+    const [errorMessage, setErrorMessage] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false); // Flag for edit mode
     const [editProduct, setEditProduct] = useState(null); // Product being edited
@@ -15,22 +16,26 @@ const AdminDashboard = () => {
         try {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
-
-            // Fetch products
-            const productsRes = await fetch('http://localhost:3000/admin/products', { headers });
-            const productsData = await productsRes.json();
-
-            // Fetch users
-            const usersRes = await fetch('http://localhost:3000/admin/users', { headers });
-            const usersData = await usersRes.json();
-
-            setProducts(productsData);
-            setUsers(usersData);
-            setIsLoading(false);
+    
+            const [productsRes, usersRes] = await Promise.all([
+                fetch('http://localhost:3000/admin/products', { headers }),
+                fetch('http://localhost:3000/admin/users', { headers }),
+            ]);
+    
+            if (!productsRes.ok || !usersRes.ok) {
+                throw new Error('Failed to fetch admin data');
+            }
+    
+            setProducts(await productsRes.json());
+            setUsers(await usersRes.json());
         } catch (error) {
-            console.error('Failed to fetch admin data', error);
+            console.error(error);
+            setErrorMessage(error.message || 'An error occurred');
+        } finally {
+            setIsLoading(false);
         }
     };
+    
 
     useEffect(() => {
         const isAdmin = localStorage.getItem('isAdmin') === 'true';

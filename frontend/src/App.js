@@ -4,6 +4,7 @@ import Login from './components/Login'; // Import the Login component
 import Navbar from './components/Navbar'; // Import the Navbar component
 import TaskManager from './components/TaskManager'; // Import the TaskManager component
 import ECommerce from './components/ECommerce'; // Import the ECommerce component
+import AdminDashboard from './components/AdminDashboard';
 
 const App = () => {
     const [errorMessage, setErrorMessage] = useState(''); // State to manage error messages
@@ -35,6 +36,10 @@ const App = () => {
                     <Route
                         path="/ecommerce"
                         element={isAuthenticated ? <ECommerce /> : <Navigate to="/auth" />}
+                    />
+                    <Route
+                        path="/admin"
+                        element={isAuthenticated ? <AdminDashboard /> : <Navigate to="/auth" />}
                     />
                     <Route
                         path="*"

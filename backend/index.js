@@ -18,23 +18,20 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Firestore Database Reference
 const db = admin.firestore();
 
-// User Authentication Middleware
-
 const authenticate = (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1]; // Extract the token after "Bearer"
+    const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'Unauthorized' });
 
     jwt.verify(token, 'secret_key', (err, decoded) => {
         if (err) return res.status(403).json({ message: 'Forbidden' });
 
-        // Extracting email and uid from the decoded token
         if (decoded && decoded.email && decoded.uid) {
             req.user = {
                 email: decoded.email,
                 uid: decoded.uid,
+                isAdmin: decoded.isAdmin, // Include isAdmin
             };
             next();
         } else {
@@ -42,6 +39,7 @@ const authenticate = (req, res, next) => {
         }
     });
 };
+
 
 module.exports = authenticate;
 
@@ -84,6 +82,7 @@ app.post('/register', async (req, res) => {
 
         res.json({ uid: userRecord.uid });
     } catch (error) {
+        console.error("Error during registration:", error); 
         let errorMessage = 'An error occurred during registration';
         if (error.code === 'auth/email-already-exists') {
             errorMessage = 'Email is already registered';
