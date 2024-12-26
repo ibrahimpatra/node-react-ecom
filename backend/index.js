@@ -46,22 +46,6 @@ const authenticate = (req, res, next) => {
 module.exports = authenticate;
 
 
-const checkAdmin = async (req, res, next) => {
-    try {
-        const userDoc = await db.collection('users').doc(req.user.uid).get();
-
-        if (!userDoc.exists || !userDoc.data().isAdmin) {
-            return res.status(403).json({ message: 'Admin access required' });
-        }
-
-        next();
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to verify admin status' });
-    }
-};
-
-module.exports = checkAdmin;
-
 
 app.post('/register', async (req, res) => {
     const { email, password } = req.body;
@@ -203,15 +187,15 @@ app.delete('/tasks/:id', authenticate, async (req, res) => {
 });
 
 // E-commerce Endpoints
-// app.post('/products', authenticate, async (req, res) => {
-//     try {
-//         const product = req.body;
-//         const docRef = await db.collection('products').add(product);
-//         res.json({ id: docRef.id, ...product });
-//     } catch (error) {
-//         res.status(500).json({ error: error.message });
-//     }
-// });
+app.post('/products', authenticate, async (req, res) => {
+    try {
+        const product = req.body;
+        const docRef = await db.collection('products').add(product);
+        res.json({ id: docRef.id, ...product });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 app.get('/products', async (req, res) => {
     try {
@@ -233,105 +217,27 @@ app.get('/products/:id', async (req, res) => {
     }
 });
 
-app.post('/admin/products', authenticate, checkAdmin, async (req, res) => {
+app.put('/products/:id', async (req, res) => {
     try {
-        const product = req.body;
-        if (!product.name || !product.price) {
-            return res.status(400).json({ message: 'Product name and price are required' });
-        }
+        const { id } = req.params;
+        const updatedProduct = req.body;
 
-        const docRef = await db.collection('products').add(product);
-        res.json({ id: docRef.id, ...product });
+        await db.collection('products').doc(id).update(updatedProduct);
+        res.json({ id, ...updatedProduct });
     } catch (error) {
-        res.status(500).json({ message: 'Failed to add product' });
+        res.status(500).json({ error: error.message });
     }
 });
 
-
-app.put('/admin/products/:id', authenticate, checkAdmin, async (req, res) => {
+app.delete('/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const product = req.body;
-
-        if (!product.name || !product.price) {
-            return res.status(400).json({ message: 'Product name and price are required' });
-        }
-
-        const productDoc = db.collection('products').doc(id);
-        const doc = await productDoc.get();
-
-        if (!doc.exists) {
-            return res.status(404).json({ message: 'Product not found' });
-        }
-
-        await productDoc.update(product);
-        res.json({ id, ...product });
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to update product' });
-    }
-});
-
-
-app.delete('/admin/products/:id', authenticate, checkAdmin, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const productDoc = db.collection('products').doc(id);
-
-        const doc = await productDoc.get();
-        if (!doc.exists) {
-            return res.status(404).json({ message: 'Product not found' });
-        }
-
-        await productDoc.delete();
+        await db.collection('products').doc(id).delete();
         res.sendStatus(204);
     } catch (error) {
-        res.status(500).json({ message: 'Failed to delete product' });
+        res.status(500).json({ error: error.message });
     }
 });
-
-
-app.put('/admin/users/:id', authenticate, checkAdmin, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { username, isAdmin } = req.body;
-
-        if (username === undefined && isAdmin === undefined) {
-            return res.status(400).json({ message: 'At least one field (username or isAdmin) is required' });
-        }
-
-        const userDoc = db.collection('users').doc(id);
-        const doc = await userDoc.get();
-
-        if (!doc.exists) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        const updates = {};
-        if (username) updates.username = username;
-        if (typeof isAdmin === 'boolean') updates.isAdmin = isAdmin;
-
-        await userDoc.update(updates);
-        res.json({ id, ...updates });
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to update user' });
-    }
-});
-
-
-app.get('/admin/users', authenticate, checkAdmin, async (req, res) => {
-    try {
-        const usersSnapshot = await db.collection('users').get();
-        const users = usersSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-        }));
-
-        res.json(users);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch users' });
-    }
-});
-
 
 
 // Start Server
