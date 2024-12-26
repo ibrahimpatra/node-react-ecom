@@ -160,6 +160,27 @@ const ECommerce = () => {
     }
   };
   
+  const handleAddToCart = async (productId) => {
+    try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            alert("You need to log in to proceed.");
+            return;
+        }
+
+        await axios.post(
+            "http://localhost:3000/cart",
+            { productId },
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        alert("Product added to cart!");
+    } catch (error) {
+        console.error("Error adding to cart:", error);
+        alert("Failed to add product to cart. Please try again.");
+    }
+};
+
 
   const resetForm = () => {
     setIsEditing(false);
@@ -240,6 +261,8 @@ const ECommerce = () => {
                 <p>Category: {categories.find((c) => c.id === product.categoryId)?.name}</p>
                 <button onClick={() => handleEditProduct(product)}>Edit</button>
                 <button onClick={() => handleDeleteProduct(product.id)}>Delete</button>
+                <button onClick={() => handleAddToCart(product.id)}>Add to Cart</button>;
+
               </div>
             ))
           ) : (

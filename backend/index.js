@@ -310,6 +310,54 @@ app.delete('/products/:id', async (req, res) => {
     }
 });
 
+// Add a product to the cart
+app.post('/cart', authenticate, async (req, res) => {
+    const { productId } = req.body;
+    const { uid } = req.user;
+
+    if (!productId) {
+        return res.status(400).json({ message: 'Product ID is required' });
+    }
+
+    try {
+        const cartRef = db.collection('carts').doc(uid);
+        const cartDoc = await cartRef.get();
+
+        if (!cartDoc.exists) {
+            await cartRef.set({ products: [productId] });
+        } else {
+            const { products } = cartDoc.data();
+            if (!products.includes(productId)) {
+                await cartRef.update({ products: [...products, productId] });
+            }
+        }
+
+        res.json({ message: 'Product added to cart' });
+    } catch (error) {
+        console.error('Error adding to cart:', error);
+        res.status(500).json({ message: 'Failed to add product to cart' });
+    }
+});
+
+// Get products in the cart
+app.get('/cart', authenticate, async (req, res) => {
+    const { uid } = req.user;
+
+    try {
+        const cartRef = db.collection('carts').doc(uid);
+        const cartDoc = await cartRef.get();
+
+        if (!cartDoc.exists) {
+            return res.json({ products: [] });
+        }
+
+        const { products } = cartDoc.data();
+        res.json({ products });
+    } catch (error) {
+        console.error('Error fetching cart:', error);
+        res.status(500).json({ message: 'Failed to fetch cart' });
+    }
+});
 
 // Start Server
 app.listen(3000, () => console.log('Server running on http://localhost:3000'));
