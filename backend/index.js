@@ -187,9 +187,80 @@ app.delete('/tasks/:id', authenticate, async (req, res) => {
 });
 
 // E-commerce Endpoints
+// E-commerce: Brand and Category APIs
+
+// Fetch all brands
+app.get('/brands', async (req, res) => {
+    try {
+        const snapshot = await db.collection('brands').get();
+        const brands = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        res.json(brands);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Add new brand
+app.post('/brands', async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name) {
+            return res.status(400).json({ message: 'Brand name is required' });
+        }
+
+        const brand = { name };
+        const docRef = await db.collection('brands').add(brand);
+        res.json({ id: docRef.id, ...brand });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Fetch all categories
+app.get('/categories', async (req, res) => {
+    try {
+        const snapshot = await db.collection('categories').get();
+        const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        res.json(categories);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Add new category
+app.post('/categories', async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name) {
+            return res.status(400).json({ message: 'Category name is required' });
+        }
+
+        const category = { name };
+        const docRef = await db.collection('categories').add(category);
+        res.json({ id: docRef.id, ...category });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Add new product with linked brand and category
 app.post('/products', authenticate, async (req, res) => {
     try {
-        const product = req.body;
+        const { name, description, price, brandId, categoryId } = req.body;
+
+        if (!name || !description || !price || !brandId || !categoryId) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+
+        const product = {
+            name,
+            description,
+            price,
+            brandId,
+            categoryId,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
         const docRef = await db.collection('products').add(product);
         res.json({ id: docRef.id, ...product });
     } catch (error) {
