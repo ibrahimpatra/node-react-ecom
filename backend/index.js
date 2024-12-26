@@ -310,7 +310,6 @@ app.delete('/products/:id', async (req, res) => {
     }
 });
 
-// Add a product to the cart
 app.post('/cart', authenticate, async (req, res) => {
     const { productId } = req.body;
     const { uid } = req.user;
@@ -324,12 +323,18 @@ app.post('/cart', authenticate, async (req, res) => {
         const cartDoc = await cartRef.get();
 
         if (!cartDoc.exists) {
-            await cartRef.set({ products: [productId] });
+            await cartRef.set({ products: [{ id: productId, quantity: 1 }] });
         } else {
             const { products } = cartDoc.data();
-            if (!products.includes(productId)) {
-                await cartRef.update({ products: [...products, productId] });
+            const productIndex = products.findIndex((item) => item.id === productId);
+
+            if (productIndex !== -1) {
+                products[productIndex].quantity += 1;
+            } else {
+                products.push({ id: productId, quantity: 1 });
             }
+
+            await cartRef.update({ products });
         }
 
         res.json({ message: 'Product added to cart' });
@@ -338,6 +343,36 @@ app.post('/cart', authenticate, async (req, res) => {
         res.status(500).json({ message: 'Failed to add product to cart' });
     }
 });
+
+app.put('/cart', authenticate, async (req, res) => {
+    const { productId, change } = req.body;
+    const { uid } = req.user;
+
+    try {
+        const cartRef = db.collection('carts').doc(uid);
+        const cartDoc = await cartRef.get();
+
+        if (cartDoc.exists) {
+            const { products } = cartDoc.data();
+            const productIndex = products.findIndex((item) => item.id === productId);
+
+            if (productIndex !== -1) {
+                products[productIndex].quantity = Math.max(
+                    products[productIndex].quantity + change,
+                    1
+                );
+            }
+
+            await cartRef.update({ products });
+        }
+
+        res.json({ message: 'Quantity updated' });
+    } catch (error) {
+        console.error('Error updating quantity:', error);
+        res.status(500).json({ message: 'Failed to update quantity' });
+    }
+});
+
 
 // Get products in the cart
 app.get('/cart', authenticate, async (req, res) => {

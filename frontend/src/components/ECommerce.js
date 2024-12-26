@@ -160,26 +160,44 @@ const ECommerce = () => {
     }
   };
   
-  const handleAddToCart = async (productId) => {
+  const handleAddToCart = async (productId, quantity = 1) => {
     try {
         const token = localStorage.getItem("token");
         if (!token) {
+            // Replace alert with a custom notification
+            console.error("Token is missing. User might not be logged in.");
             alert("You need to log in to proceed.");
             return;
         }
 
-        await axios.post(
+        const response = await axios.post(
             "http://localhost:3000/cart",
-            { productId },
+            { productId, quantity },
             { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        alert("Product added to cart!");
+        // Replace alert with a toast or custom modal
+        console.log("Response:", response.data);
+        alert("Product added to cart successfully!");
+        
+        // Update cart state (if applicable)
+        // updateCartState(response.data.cart); // Implement this function in your app if necessary
+
     } catch (error) {
-        console.error("Error adding to cart:", error);
-        alert("Failed to add product to cart. Please try again.");
+        // Handle different types of errors
+        if (error.response) {
+            console.error("Server Error:", error.response.data.message);
+            alert(`Error: ${error.response.data.message}`);
+        } else if (error.request) {
+            console.error("No response from server:", error.request);
+            alert("Failed to connect to the server. Please try again.");
+        } else {
+            console.error("Error adding to cart:", error.message);
+            alert("An unexpected error occurred. Please try again.");
+        }
     }
 };
+
 
 
   const resetForm = () => {

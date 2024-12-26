@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import './Cart.css';
 
 const Cart = () => {
     const [cartProducts, setCartProducts] = useState([]);
+    const [cartTotal, setCartTotal] = useState(0);
 
     useEffect(() => {
         fetchCartProducts();
@@ -20,17 +22,43 @@ const Cart = () => {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            const productIds = res.data.products;
-
-            // Fetch product details for cart items
             const productDetails = await Promise.all(
-                productIds.map((id) => axios.get(`http://localhost:3000/products/${id}`))
+                res.data.products.map(({ id, quantity }) =>
+                    axios.get(`http://localhost:3000/products/${id}`).then(response => ({
+                        ...response.data,
+                        quantity,
+                    }))
+                )
             );
 
-            setCartProducts(productDetails.map((response) => response.data));
+            setCartProducts(productDetails);
+            calculateCartTotal(productDetails);
         } catch (error) {
             console.error("Error fetching cart:", error);
             alert("Failed to fetch cart. Please try again.");
+        }
+    };
+
+    const calculateCartTotal = (products) => {
+        const total = products.reduce((acc, product) => acc + product.price * product.quantity, 0);
+        setCartTotal(total);
+    };
+
+    const updateQuantity = async (productId, change) => {
+        try {
+            const updatedCart = cartProducts.map((product) =>
+                product.id === productId
+                    ? { ...product, quantity: Math.max(product.quantity + change, 1) }
+                    : product
+            );
+            setCartProducts(updatedCart);
+            calculateCartTotal(updatedCart);
+
+            await axios.put("http://localhost:3000/cart", { productId, change }, {
+                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            });
+        } catch (error) {
+            console.error("Error updating quantity:", error);
         }
     };
 
@@ -44,8 +72,13 @@ const Cart = () => {
                             <h3>{product.name}</h3>
                             <p>{product.description}</p>
                             <p>Price: ${product.price}</p>
+                            <p>Quantity: {product.quantity}</p>
+                            <p>Total: ${product.price * product.quantity}</p>
+                            <button onClick={() => updateQuantity(product.id, 1)}>+</button>
+                            <button onClick={() => updateQuantity(product.id, -1)}>-</button>
                         </div>
                     ))}
+                    <h3>Cart Total: ${cartTotal}</h3>
                 </div>
             ) : (
                 <p>Your cart is empty.</p>
