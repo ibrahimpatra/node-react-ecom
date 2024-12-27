@@ -1,22 +1,15 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import ProductForm from "./ProductForm";
 import "./ECommerce.css";
 
 const ECommerce = () => {
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    price: "",
-    brandId: "",
-    categoryId: "",
-  });
-  const [newBrand, setNewBrand] = useState("");
-  const [newCategory, setNewCategory] = useState("");
   const [isEditing, setIsEditing] = useState(false);
-  const [currentProductId, setCurrentProductId] = useState(null);
+  const [currentProduct, setCurrentProduct] = useState(null);
+  const [showForm, setShowForm] = useState(false); // State to control the visibility of the ProductForm
 
   useEffect(() => {
     fetchProducts();
@@ -52,103 +45,10 @@ const ECommerce = () => {
     }
   };
 
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddBrand = async () => {
-    if (!newBrand.trim()) {
-      alert("Please enter a brand name.");
-      return;
-    }
-    try {
-      const res = await axios.post("http://localhost:3000/brands", { name: newBrand });
-      setBrands((prev) => [...prev, res.data]);
-      setNewBrand("");
-    } catch (error) {
-      console.error("Error adding brand:", error);
-      alert("Failed to add brand. Please try again.");
-    }
-  };
-
-  const handleAddCategory = async () => {
-    if (!newCategory.trim()) {
-      alert("Please enter a category name.");
-      return;
-    }
-    try {
-      const res = await axios.post("http://localhost:3000/categories", { name: newCategory });
-      setCategories((prev) => [...prev, res.data]);
-      setNewCategory("");
-    } catch (error) {
-      console.error("Error adding category:", error);
-      alert("Failed to add category. Please try again.");
-    }
-  };
-
-  const handleAddOrUpdateProduct = async () => {
-    if (!form.name || !form.description || !form.price || !form.brandId || !form.categoryId) {
-      alert("Please fill out all fields.");
-      return;
-    }
-
-    const token = localStorage.getItem("token");
-    if (!token) {
-      alert("You need to log in to proceed.");
-      return;
-    }
-
-    try {
-      const productData = {
-        name: form.name,
-        description: form.description,
-        price: form.price,
-        brandId: form.brandId,
-        categoryId: form.categoryId,
-      };
-
-      if (isEditing) {
-        await axios.put(
-          `http://localhost:3000/products/${currentProductId}`,
-          productData,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-      } else {
-        const response = await axios.post(
-          "http://localhost:3000/products",
-          productData,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        setProducts((prevProducts) => [...prevProducts, response.data]);
-      }
-
-      resetForm();
-      fetchProducts(); // Refresh product list
-    } catch (error) {
-      console.error("Error saving product:", error);
-      alert("Failed to save product. Please try again.");
-    }
-  };
-
   const handleEditProduct = (product) => {
     setIsEditing(true);
-    setCurrentProductId(product.id);
-    setForm({
-      name: product.name,
-      description: product.description,
-      price: product.price,
-      brandId: product.brandId,
-      categoryId: product.categoryId,
-    });
+    setCurrentProduct(product);
+    setShowForm(true); // Show the form when editing
   };
 
   const handleDeleteProduct = async (id) => {
@@ -159,113 +59,60 @@ const ECommerce = () => {
       console.error("Error deleting product:", error);
     }
   };
-  
+
+  const handleAddProduct = () => {
+    // Toggle the visibility of the ProductForm
+    setShowForm(prevState => !prevState);
+    setIsEditing(false); // Ensure it's not in edit mode when adding a new product
+    setCurrentProduct(null); // Clear the current product
+  };
+
   const handleAddToCart = async (productId, quantity = 1) => {
     try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-            // Replace alert with a custom notification
-            console.error("Token is missing. User might not be logged in.");
-            alert("You need to log in to proceed.");
-            return;
-        }
+      const token = localStorage.getItem("token");
+      if (!token) {
+        alert("You need to log in to proceed.");
+        return;
+      }
 
-        const response = await axios.post(
-            "http://localhost:3000/cart",
-            { productId, quantity },
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        // Replace alert with a toast or custom modal
-        console.log("Response:", response.data);
-        alert("Product added to cart successfully!");
-        
-        // Update cart state (if applicable)
-        // updateCartState(response.data.cart); // Implement this function in your app if necessary
-
+      await axios.post(
+        "http://localhost:3000/cart",
+        { productId, quantity },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert("Product added to cart successfully!");
     } catch (error) {
-        // Handle different types of errors
-        if (error.response) {
-            console.error("Server Error:", error.response.data.message);
-            alert(`Error: ${error.response.data.message}`);
-        } else if (error.request) {
-            console.error("No response from server:", error.request);
-            alert("Failed to connect to the server. Please try again.");
-        } else {
-            console.error("Error adding to cart:", error.message);
-            alert("An unexpected error occurred. Please try again.");
-        }
+      console.error("Error adding to cart:", error);
+      alert("Failed to add to cart. Please try again.");
     }
-};
-
-
-
-  const resetForm = () => {
-    setIsEditing(false);
-    setCurrentProductId(null);
-    setForm({ name: "", description: "", price: "", brandId: "", categoryId: "" });
   };
 
   return (
     <div className="ecommerce">
-      <div className="product-form">
-        <h2>{isEditing ? "Edit Product" : "Add Product"}</h2>
-        <input
-          type="text"
-          name="name"
-          value={form.name}
-          onChange={handleFormChange}
-          placeholder="Product Name"
-        />
-        <textarea
-          name="description"
-          value={form.description}
-          onChange={handleFormChange}
-          placeholder="Description"
-        />
-        <input
-          type="number"
-          name="price"
-          value={form.price}
-          onChange={handleFormChange}
-          placeholder="Price"
-        />
-        <select name="brandId" value={form.brandId} onChange={handleFormChange}>
-          <option value="">Select Brand</option>
-          {brands.map((brand) => (
-            <option key={brand.id} value={brand.id}>
-              {brand.name}
-            </option>
-          ))}
-        </select>
-        <input
-          type="text"
-          value={newBrand}
-          onChange={(e) => setNewBrand(e.target.value)}
-          placeholder="Add New Brand"
-        />
-        <button onClick={handleAddBrand}>Add Brand</button>
-        <select name="categoryId" value={form.categoryId} onChange={handleFormChange}>
-          <option value="">Select Category</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-        <input
-          type="text"
-          value={newCategory}
-          onChange={(e) => setNewCategory(e.target.value)}
-          placeholder="Add New Category"
-        />
-        <button onClick={handleAddCategory}>Add Category</button>
-        <button onClick={handleAddOrUpdateProduct}>
-          {isEditing ? "Update Product" : "Add Product"}
-        </button>
-        {isEditing && <button onClick={resetForm}>Cancel</button>}
-      </div>
+      {/* Add Product Button */}
+      <button className="add-product-btn" onClick={handleAddProduct}>
+        {showForm ? "Cancel" : "Add Product"}
+      </button>
 
+      {/* Toggle Product Form visibility */}
+      {showForm && (
+        <ProductForm
+          brands={brands}
+          categories={categories}
+          fetchProducts={fetchProducts}
+          fetchBrands={fetchBrands}
+          fetchCategories={fetchCategories}
+          isEditing={isEditing}
+          currentProduct={currentProduct}
+          resetEditingState={() => {
+            setIsEditing(false);
+            setCurrentProduct(null);
+            setShowForm(false); // Hide the form after submission or cancellation
+          }}
+        />
+      )}
+
+      {/* Product List */}
       <div className="products">
         <h2>Products</h2>
         <div className="grid">
@@ -279,8 +126,7 @@ const ECommerce = () => {
                 <p>Category: {categories.find((c) => c.id === product.categoryId)?.name}</p>
                 <button onClick={() => handleEditProduct(product)}>Edit</button>
                 <button onClick={() => handleDeleteProduct(product.id)}>Delete</button>
-                <button onClick={() => handleAddToCart(product.id)}>Add to Cart</button>;
-
+                <button onClick={() => handleAddToCart(product.id)}>Add to Cart</button>
               </div>
             ))
           ) : (

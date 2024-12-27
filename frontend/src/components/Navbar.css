@@ -1,120 +1,62 @@
-/* General Reset */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: Arial, sans-serif;
-}
-
-/* Navbar Styles */
 .navbar {
-  background-color: #333;
-  color: #fff;
-  padding: 15px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-}
-
-.navbar a {
-  color: #fff;
-  text-decoration: none;
-  font-size: 18px;
-  margin-right: 20px;
-  transition: color 0.3s ease;
-}
-
-.navbar a:hover {
-  color: #f39c12; /* Bright yellow color on hover */
-}
-
-.navbar button {
-  background-color: #e74c3c;
-  border: none;
+  padding: 0.5rem 1rem;
+  background-color: #333;
   color: white;
-  font-size: 16px;
-  padding: 10px 20px;
+  position: relative; /* Navbar acts as a reference for positioning */
+  z-index: 1000; /* Ensures the navbar and dropdown are always visible */
+}
+
+.nav-links {
+  display: flex;
+  gap: 1rem;
+}
+
+.nav-links a,
+.nav-links button {
+  color: white;
+  text-decoration: none;
+  background: none;
+  border: none;
+  font-size: 1rem;
   cursor: pointer;
-  transition: background-color 0.3s ease;
 }
 
-.navbar button:hover {
-  background-color: #c0392b;
+.burger-menu {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: white;
+  cursor: pointer;
 }
 
-/* Mobile Styles */
 @media (max-width: 768px) {
-  .navbar {
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .navbar-links {
+  .nav-links {
     display: none;
     flex-direction: column;
-    position: absolute;
-    top: 60px;
-    right: 0;
+    gap: 0.5rem;
+    position: absolute; /* Dropdown appears relative to navbar */
+    top: 100%; /* Positions dropdown immediately below navbar */
+    left: 0;
+    width: 100%; /* Dropdown spans the width of the navbar */
     background-color: #333;
-    width: 200px;
-    padding: 20px;
-    border-radius: 5px;
+    padding: 1rem 0;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
   }
 
-  .navbar-links.open {
+  .nav-links.open {
     display: flex;
   }
 
-  .navbar a {
-    margin: 10px 0;
-    font-size: 16px;
-  }
-
-  .navbar button {
-    margin-top: 10px;
-  }
-
-  .hamburger {
-    display: block;
-    cursor: pointer;
-    font-size: 28px;
-  }
-
-  .hamburger.close {
+  .burger-menu {
     display: block;
   }
 }
 
-/* Tablet and Desktop Styles */
-@media (min-width: 769px) {
-  .navbar {
-    flex-direction: row;
-  }
-
-  .navbar a {
-    font-size: 18px;
-  }
-
-  .navbar button {
-    font-size: 16px;
-  }
-
-  .hamburger {
-    display: none;
-  }
-}
-
-/* Hover Effects */
-.navbar a:hover,
-.navbar button:hover {
-  transform: translateY(-3px);
-}
-
-/* Smooth Transition for Button and Links */
-.navbar a,
-.navbar button {
-  transition: transform 0.3s ease, color 0.3s ease;
+body {
+  margin: 0; /* Remove any default margins to align the navbar properly */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
 }

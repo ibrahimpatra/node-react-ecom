@@ -1,6 +1,3 @@
-// Full-Stack Application Integrating Task Manager, E-commerce, and Gallery
-
-// Backend: Node.js
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -394,5 +391,96 @@ app.get('/cart', authenticate, async (req, res) => {
     }
 });
 
+app.delete('/cart', authenticate, async (req, res) => {
+    const { productId } = req.body;
+    const { uid } = req.user;
+
+    try {
+        const cartRef = db.collection('carts').doc(uid);
+        const cartDoc = await cartRef.get();
+
+        if (cartDoc.exists) {
+            let { products } = cartDoc.data();
+
+            // Filter out the product to delete
+            products = products.filter((product) => product.id !== productId);
+
+            // Update the cart in the database
+            await cartRef.update({ products });
+        }
+
+        res.json({ message: 'Product removed from cart' });
+    } catch (error) {
+        console.error('Error removing product:', error);
+        res.status(500).json({ message: 'Failed to remove product' });
+    }
+});
+
+
+app.post('/order', authenticate, async (req, res) => {
+    const { address, name, email, phone, paymentMethod } = req.body;
+    const { uid } = req.user;
+
+    if (!address || !name || !email || !phone || !paymentMethod) {
+        return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    try {
+        const cartRef = db.collection('carts').doc(uid);
+        const cartDoc = await cartRef.get();
+
+        if (!cartDoc.exists) {
+            return res.status(400).json({ message: 'Cart is empty' });
+        }
+
+        const { products } = cartDoc.data();
+
+        // Create an order
+        const order = {
+            uid,
+            address,
+            name,
+            email,
+            phone,
+            paymentMethod,
+            products,
+            totalQuantity: products.reduce((acc, item) => acc + item.quantity, 0),
+            totalPrice: products.reduce((acc, item) => acc + item.price * item.quantity, 0),
+            createdAt: new Date(),
+        };
+
+        await db.collection('orders').add(order);
+
+        // Clear the cart
+        await cartRef.delete();
+
+        res.json({ message: 'Order placed successfully' });
+    } catch (error) {
+        console.error('Error placing order:', error);
+        res.status(500).json({ message: 'Failed to place order' });
+    }
+});
+
+app.get('/orders', authenticate, async (req, res) => {
+    const { uid } = req.user;
+
+    try {
+        const ordersRef = db.collection('orders').where('uid', '==', uid);
+        const snapshot = await ordersRef.get();
+
+        const orders = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate(), // Ensure `createdAt` is converted to a JavaScript Date
+        }));
+        res.json(orders);
+    } catch (error) {
+        console.error('Error fetching orders:', error);
+        res.status(500).json({ message: 'Failed to fetch orders' });
+    }
+});
+
+
+  
 // Start Server
 app.listen(3000, () => console.log('Server running on http://localhost:3000'));

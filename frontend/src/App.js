@@ -5,6 +5,7 @@ import Navbar from './components/Navbar'; // Import the Navbar component
 import TaskManager from './components/TaskManager'; // Import the TaskManager component
 import ECommerce from './components/ECommerce'; // Import the ECommerce component
 import Cart from './components/Cart';
+import Orders from './components/Orders';
 
 const App = () => {
     const [errorMessage, setErrorMessage] = useState(''); // State to manage error messages
@@ -42,8 +43,12 @@ const App = () => {
                         element={isAuthenticated ? <Cart /> : <Navigate to="/auth" />}
                     />
                     <Route
+                        path="/orders"
+                        element={isAuthenticated ? <Orders /> : <Navigate to="/auth" />}
+                    />
+                    <Route
                         path="*"
-                        element={<Navigate to={isAuthenticated ? "/tasks" : "/auth"} />}
+                        element={<Navigate to={isAuthenticated ? "/ecommerce" : "/auth"} />}
                     />
                 </Routes>
             </div>
