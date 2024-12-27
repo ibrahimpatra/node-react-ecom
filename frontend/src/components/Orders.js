@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import './Orders.css'; // Importing the CSS file
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -20,27 +21,22 @@ const Orders = () => {
     }
   };
 
-  const formatDate = (timestamp) => {
-    const date = new Date(timestamp.seconds * 1000); // Firestore stores timestamp as seconds
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
   return (
-    <div>
+    <div className="orders-container">
       <h2>Your Orders</h2>
       {orders.length > 0 ? (
-        orders.map(order => (
-          <div key={order.id}>
-            <h3>Order #{order.id}</h3>
-            <p>Total: ${order.totalPrice}</p>
-            <p>Quantity: {order.totalQuantity}</p>
-            <p>Placed on: {order.createdAt}</p>
-          </div>
-        ))
+        <div className="orders-list">
+          {orders.map(order => (
+            <div className="order-card" key={order.id}>
+              <h3 className="order-title">Order #{order.id}</h3>
+              <div className="order-details">
+                <p className="order-total">Total: <span className="order-price">${order.totalPrice}</span></p>
+                <p className="order-quantity">Quantity: {order.totalQuantity}</p>
+                <p className="order-date">Placed on: {order.createdAt}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <p>No orders found.</p>
       )}
