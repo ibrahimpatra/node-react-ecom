@@ -511,6 +511,24 @@ app.get('/cart', authenticate, async (req, res) => {
     }
 });
 
+app.get('/orders', authenticate, async (req, res) => {
+    const { uid } = req.user;
+
+    try {
+        const ordersRef = db.collection('orders').where('uid', '==', uid);
+        const snapshot = await ordersRef.get();
+
+        const orders = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate(), // Ensure `createdAt` is converted to a JavaScript Date
+        }));
+        res.json(orders);
+    } catch (error) {
+        console.error('Error fetching orders:', error);
+        res.status(500).json({ message: 'Failed to fetch orders' });
+    }
+});
   
 // Start Server
 app.listen(3000, () => console.log('Server running on http://localhost:3000'));
