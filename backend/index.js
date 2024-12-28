@@ -319,19 +319,32 @@ app.post('/cart', authenticate, async (req, res) => {
         const cartRef = db.collection('carts').doc(uid);
         const cartDoc = await cartRef.get();
 
+        const productDetails = await db.collection('products').doc(productId).get();
+        const productPrice = Number(productDetails.data().price || 0); // Ensure price is a number
+
         if (!cartDoc.exists) {
-            await cartRef.set({ products: [{ id: productId, quantity: 1 }] });
+            const newProduct = { id: productId, quantity: 1, totalPrice: productPrice };
+            await cartRef.set({ 
+                products: [newProduct], 
+                totalQuantity: 1, 
+                totalPrice: productPrice 
+            });
         } else {
             const { products } = cartDoc.data();
             const productIndex = products.findIndex((item) => item.id === productId);
 
             if (productIndex !== -1) {
-                products[productIndex].quantity += 1;
+                const product = products[productIndex];
+                product.quantity += 1;
+                product.totalPrice = product.quantity * productPrice;
             } else {
-                products.push({ id: productId, quantity: 1 });
+                products.push({ id: productId, quantity: 1, totalPrice: productPrice });
             }
 
-            await cartRef.update({ products });
+            const totalQuantity = products.reduce((acc, p) => acc + p.quantity, 0);
+            const totalPrice = products.reduce((acc, p) => acc + p.totalPrice, 0);
+
+            await cartRef.update({ products, totalQuantity, totalPrice });
         }
 
         res.json({ message: 'Product added to cart' });
@@ -347,29 +360,41 @@ app.put('/cart', authenticate, async (req, res) => {
 
     try {
         const cartRef = db.collection('carts').doc(uid);
-        const cartDoc = await cartRef.get();
+        await db.runTransaction(async (transaction) => {
+            const cartDoc = await transaction.get(cartRef);
 
-        if (cartDoc.exists) {
+            if (!cartDoc.exists) {
+                throw new Error('Cart does not exist');
+            }
+
             const { products } = cartDoc.data();
             const productIndex = products.findIndex((item) => item.id === productId);
 
-            if (productIndex !== -1) {
-                products[productIndex].quantity = Math.max(
-                    products[productIndex].quantity + change,
-                    1
-                );
+            if (productIndex === -1) {
+                throw new Error('Product not found in cart');
             }
 
-            await cartRef.update({ products });
-        }
+            const product = products[productIndex];
+            product.quantity = Math.max(product.quantity + change, 1);
 
-        res.json({ message: 'Quantity updated' });
+            const productDetails = await db.collection('products').doc(productId).get();
+            const productPrice = Number(productDetails.data().price || 0);
+
+            product.totalPrice = product.quantity * productPrice;
+
+            const totalQuantity = products.reduce((acc, p) => acc + p.quantity, 0);
+            const totalPrice = products.reduce((acc, p) => acc + p.totalPrice, 0);
+
+            transaction.update(cartRef, { products, totalQuantity, totalPrice });
+        });
+
+        const updatedCart = (await cartRef.get()).data();
+        res.json(updatedCart);
     } catch (error) {
         console.error('Error updating quantity:', error);
         res.status(500).json({ message: 'Failed to update quantity' });
     }
 });
-
 
 // Get products in the cart
 app.get('/cart', authenticate, async (req, res) => {
@@ -397,62 +422,56 @@ app.delete('/cart', authenticate, async (req, res) => {
 
     try {
         const cartRef = db.collection('carts').doc(uid);
-        const cartDoc = await cartRef.get();
+        await db.runTransaction(async (transaction) => {
+            const cartDoc = await transaction.get(cartRef);
 
-        if (cartDoc.exists) {
+            if (!cartDoc.exists) {
+                throw new Error('Cart does not exist');
+            }
+
             let { products } = cartDoc.data();
-
-            // Filter out the product to delete
             products = products.filter((product) => product.id !== productId);
 
-            // Update the cart in the database
-            await cartRef.update({ products });
-        }
+            const totalQuantity = products.reduce((acc, p) => acc + p.quantity, 0);
+            const totalPrice = products.reduce((acc, p) => acc + p.totalPrice, 0);
 
-        res.json({ message: 'Product removed from cart' });
+            transaction.update(cartRef, { products, totalQuantity, totalPrice });
+        });
+
+        const updatedCart = (await cartRef.get()).data();
+        res.json(updatedCart);
     } catch (error) {
         console.error('Error removing product:', error);
         res.status(500).json({ message: 'Failed to remove product' });
     }
 });
 
-
 app.post('/order', authenticate, async (req, res) => {
-    const { address, name, email, phone, paymentMethod } = req.body;
     const { uid } = req.user;
+    const { products, totalPrice, totalQuantity, name, email, phone, address, paymentMethod } = req.body;
 
-    if (!address || !name || !email || !phone || !paymentMethod) {
-        return res.status(400).json({ message: 'All fields are required' });
+    if (!products || products.length === 0) {
+        return res.status(400).json({ message: 'No products in the order' });
     }
 
     try {
-        const cartRef = db.collection('carts').doc(uid);
-        const cartDoc = await cartRef.get();
-
-        if (!cartDoc.exists) {
-            return res.status(400).json({ message: 'Cart is empty' });
-        }
-
-        const { products } = cartDoc.data();
-
-        // Create an order
-        const order = {
+        const orderData = {
             uid,
-            address,
             name,
             email,
             phone,
+            address,
             paymentMethod,
             products,
-            totalQuantity: products.reduce((acc, item) => acc + item.quantity, 0),
-            totalPrice: products.reduce((acc, item) => acc + item.price * item.quantity, 0),
+            totalPrice,
+            totalQuantity,
             createdAt: new Date(),
         };
 
-        await db.collection('orders').add(order);
+        await db.collection('orders').add(orderData);
 
-        // Clear the cart
-        await cartRef.delete();
+        // Optionally clear the cart after the order is placed
+        await db.collection('carts').doc(uid).delete();
 
         res.json({ message: 'Order placed successfully' });
     } catch (error) {
@@ -461,25 +480,36 @@ app.post('/order', authenticate, async (req, res) => {
     }
 });
 
-app.get('/orders', authenticate, async (req, res) => {
+app.get('/cart', authenticate, async (req, res) => {
     const { uid } = req.user;
 
     try {
-        const ordersRef = db.collection('orders').where('uid', '==', uid);
-        const snapshot = await ordersRef.get();
+        const cartRef = db.collection('carts').doc(uid);
+        const cartDoc = await cartRef.get();
 
-        const orders = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate(), // Ensure `createdAt` is converted to a JavaScript Date
-        }));
-        res.json(orders);
+        if (!cartDoc.exists) {
+            return res.json({ products: [] });
+        }
+
+        const { products } = cartDoc.data();
+
+        // Fetch product details for each product in the cart
+        const updatedProducts = await Promise.all(
+            products.map(async (product) => {
+                const productDetails = await db.collection('products').doc(product.id).get();
+                return {
+                    ...product,
+                    price: productDetails.data().price || 0, // Add price to product
+                };
+            })
+        );
+
+        res.json({ products: updatedProducts });
     } catch (error) {
-        console.error('Error fetching orders:', error);
-        res.status(500).json({ message: 'Failed to fetch orders' });
+        console.error('Error fetching cart:', error);
+        res.status(500).json({ message: 'Failed to fetch cart' });
     }
 });
-
 
   
 // Start Server

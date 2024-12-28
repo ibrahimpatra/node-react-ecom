@@ -9,7 +9,6 @@ const Cart = () => {
     const [totalQuantity, setTotalQuantity] = useState(0);
     const [showCheckoutForm, setShowCheckoutForm] = useState(false);
 
-
     useEffect(() => {
         fetchCartProducts();
     }, []);
@@ -27,49 +26,72 @@ const Cart = () => {
             });
 
             const productDetails = await Promise.all(
-                res.data.products.map(({ id, quantity }) =>
-                    axios.get(`http://localhost:3000/products/${id}`).then(response => ({
+                res.data.products.map(async ({ id, quantity }) => {
+                    const response = await axios.get(`http://localhost:3000/products/${id}`);
+                    const price = Number(response.data.price) || 0; // Fallback to 0 if price is invalid
+                    return {
                         ...response.data,
                         quantity,
-                    }))
-                )
+                        price,
+                        totalPrice: price * quantity, // Calculate total price
+                    };
+                })
             );
 
             setCartProducts(productDetails);
-            calculateCartTotal(productDetails);
-            calculateTotalQuantity(productDetails);
+            calculateCartSummary(productDetails);
         } catch (error) {
             console.error("Error fetching cart:", error);
             alert("Failed to fetch cart. Please try again.");
         }
     };
 
-    const calculateCartTotal = (products) => {
-        const total = products.reduce((acc, product) => acc + product.price * product.quantity, 0);
-        setCartTotal(total);
-    };
+    const calculateCartSummary = (products) => {
+        const total = products.reduce((acc, product) => acc + (product.totalPrice || 0), 0);
+        const totalQty = products.reduce((acc, product) => acc + product.quantity, 0);
 
-    const calculateTotalQuantity = (products) => {
-        const totalQuantity = products.reduce((acc, product) => acc + product.quantity, 0);
-        setTotalQuantity(totalQuantity);
+        setCartTotal(total.toFixed(2)); // Ensure total is a string with 2 decimal places
+        setTotalQuantity(totalQty);
     };
 
     const updateQuantity = async (productId, change) => {
         try {
-            const updatedCart = cartProducts.map((product) =>
-                product.id === productId
-                    ? { ...product, quantity: Math.max(product.quantity + change, 1) }
-                    : product
+            setCartProducts((prev) =>
+                prev.map((product) =>
+                    product.id === productId ? { ...product, isUpdating: true } : product
+                )
             );
-            setCartProducts(updatedCart);
-            calculateCartTotal(updatedCart);
-            calculateTotalQuantity(updatedCart);
 
-            await axios.put("http://localhost:3000/cart", { productId, change }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-            });
+            const res = await axios.put(
+                "http://localhost:3000/cart",
+                { productId, change },
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+            );
+
+            const updatedProducts = await Promise.all(
+                res.data.products.map(async ({ id, quantity }) => {
+                    const response = await axios.get(`http://localhost:3000/products/${id}`);
+                    const price = Number(response.data.price) || 0; // Ensure valid price
+                    return {
+                        ...response.data,
+                        quantity,
+                        price,
+                        totalPrice: price * quantity,
+                    };
+                })
+            );
+
+            setCartProducts(updatedProducts);
+            calculateCartSummary(updatedProducts);
         } catch (error) {
             console.error("Error updating quantity:", error);
+            alert("Failed to update quantity. Please try again.");
+        } finally {
+            setCartProducts((prev) =>
+                prev.map((product) =>
+                    product.id === productId ? { ...product, isUpdating: false } : product
+                )
+            );
         }
     };
 
@@ -77,12 +99,11 @@ const Cart = () => {
         try {
             const updatedCart = cartProducts.filter((product) => product.id !== productId);
             setCartProducts(updatedCart);
-            calculateCartTotal(updatedCart);
-            calculateTotalQuantity(updatedCart);
+            calculateCartSummary(updatedCart);
 
             await axios.delete("http://localhost:3000/cart", {
                 headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-                data: { productId }
+                data: { productId },
             });
         } catch (error) {
             console.error("Error removing product:", error);
@@ -96,7 +117,19 @@ const Cart = () => {
     const handlePlaceOrder = async (orderDetails) => {
         try {
             const token = localStorage.getItem("token");
-            await axios.post("http://localhost:3000/order", orderDetails, {
+    
+            const orderData = {
+                ...orderDetails,
+                products: cartProducts.map(({ id, quantity, totalPrice }) => ({
+                    id,
+                    quantity,
+                    totalPrice,
+                })),
+                totalPrice: parseFloat(cartTotal),
+                totalQuantity,
+            };
+    
+            await axios.post("http://localhost:3000/order", orderData, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             alert("Order placed successfully!");
@@ -107,7 +140,7 @@ const Cart = () => {
             alert("Failed to place order. Please try again.");
         }
     };
-
+    
 
     return (
         <div className="cart">
@@ -119,9 +152,9 @@ const Cart = () => {
                             <div key={product.id} className="cart-product">
                                 <h3>{product.name}</h3>
                                 <p>{product.description}</p>
-                                <p>Price: ${product.price}</p>
+                                <p>Price: ${product.price.toFixed(2)}</p>
                                 <p>Quantity: {product.quantity}</p>
-                                <p className="total">Total: ${product.price * product.quantity}</p>
+                                <p className="total">Total: ${(product.totalPrice || 0).toFixed(2)}</p>
                                 <div className="quantity-controls">
                                     <button onClick={() => updateQuantity(product.id, 1)}>+</button>
                                     <button onClick={() => updateQuantity(product.id, -1)}>-</button>
@@ -133,7 +166,7 @@ const Cart = () => {
 
                     <div className="cart-summary">
                         <p>Total Quantity: <span className="total-quantity">{totalQuantity}</span></p>
-                        <p>Cart Total: ${cartTotal.toFixed(2)}</p>
+                        <p>Cart Total: ${cartTotal}</p>
                         <button onClick={handleCheckout} className="checkout-button">
                             Proceed to Checkout
                         </button>
@@ -145,7 +178,7 @@ const Cart = () => {
 
             {showCheckoutForm && (
                 <CheckoutForm
-                    total={cartTotal}
+                total={parseFloat(cartTotal)} // Pass the numeric value
                     totalQuantity={totalQuantity}
                     onPlaceOrder={handlePlaceOrder}
                     onCancel={() => setShowCheckoutForm(false)}
